@@ -1,7 +1,7 @@
 """Scheduler setup and scheduled jobs for the health bot."""
 
 import logging
-from datetime import datetime, time
+from datetime import datetime, time, tzinfo
 from telegram.ext import Application
 import pytz
 
@@ -23,10 +23,10 @@ def get_sheets_client() -> SheetsClient:
     return SheetsClient()
 
 
-def parse_time(time_str: str) -> time:
-    """Parse time string (HH:MM) to time object."""
+def parse_time(time_str: str, tz: tzinfo) -> time:
+    """Parse time string (HH:MM) to timezone-aware time object."""
     hour, minute = map(int, time_str.split(":"))
-    return time(hour=hour, minute=minute)
+    return time(hour=hour, minute=minute, tzinfo=tz)
 
 
 async def send_reminder(
@@ -217,8 +217,8 @@ def setup_scheduler(application: Application) -> None:
     tz = pytz.timezone(config.TIMEZONE)
     job_queue = application.job_queue
 
-    # Parse schedule times
-    times = {k: parse_time(v) for k, v in config.SCHEDULE.items()}
+    # Parse schedule times with timezone
+    times = {k: parse_time(v, tz) for k, v in config.SCHEDULE.items()}
 
     # Schedule all jobs
     # Wake reminder - 7am weekdays
