@@ -15,6 +15,14 @@ class SheetsClient:
 
     SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
+    # Mapping for meal types to Brazilian Portuguese
+    MEAL_TYPE_NAMES = {
+        "B": "Café da manhã",
+        "L": "Almoço",
+        "S": "Lanche",
+        "D": "Jantar",
+    }
+
     def __init__(self):
         self.credentials = Credentials.from_service_account_info(
             config.get_google_credentials(), scopes=self.SCOPES
@@ -61,11 +69,11 @@ class SheetsClient:
         row_num = len(values) + 1
         day_name = self._get_day_name()
 
-        # Initialize row with date, day name, and zeros
+        # Initialize row with date, day name, and zeros for all actions
         new_row = [today, day_name] + [0] * (len(config.DAILY_COLUMNS) - 2)
 
         # Add formulas for points columns
-        # daily_pts = sum of wake through bed (C through M)
+        # daily_pts = sum of wake through bed (C through M), with water_2 *2 and water_3 *3
         new_row[config.DAILY_COLUMNS["daily_pts"]] = (
             f"=C{row_num}+D{row_num}+E{row_num}+F{row_num}+G{row_num}+H{row_num}"
             f"+I{row_num}+J{row_num}*2+K{row_num}*3+L{row_num}+M{row_num}"
@@ -195,7 +203,16 @@ class SheetsClient:
         timestamp = now.isoformat()
         date_str = now.strftime("%Y-%m-%d")
 
-        new_row = [timestamp, date_str, meal_type, description, 1 if is_cheat else 0]
+        # Convert meal type to full Portuguese name
+        meal_name = self.MEAL_TYPE_NAMES.get(meal_type, meal_type)
+
+        new_row = [
+            timestamp,
+            date_str,
+            meal_name,
+            description,
+            "Sim" if is_cheat else "Não",
+        ]
 
         self.sheet.values().append(
             spreadsheetId=self.spreadsheet_id,
