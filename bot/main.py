@@ -19,6 +19,8 @@ from bot.handlers import (
     gym_command,
     weight_command,
     undo_command,
+    done_command,
+    help_command,
     setup_sheets_command,
     add_week_command,
     add_month_command,
@@ -76,19 +78,45 @@ def main() -> None:
         .build()
     )
 
-    # Register command handlers
+    # Register command handlers (English + Portuguese aliases)
     application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("iniciar", start_command))
+
     application.add_handler(CommandHandler("today", today_command))
+    application.add_handler(CommandHandler("hoje", today_command))
+
     application.add_handler(CommandHandler("week", week_command))
+    application.add_handler(CommandHandler("semana", week_command))
+
     application.add_handler(CommandHandler("water", water_command))
+    application.add_handler(CommandHandler("agua", water_command))
+
     application.add_handler(CommandHandler("meal", meal_command))
+    application.add_handler(CommandHandler("refeicao", meal_command))
+
     application.add_handler(CommandHandler("cheat", cheat_command))
+    application.add_handler(CommandHandler("besteira", cheat_command))
+
     application.add_handler(CommandHandler("gym", gym_command))
+    application.add_handler(CommandHandler("academia", gym_command))
+
     application.add_handler(CommandHandler("weight", weight_command))
+    application.add_handler(CommandHandler("peso", weight_command))
+
     application.add_handler(CommandHandler("undo", undo_command))
+    application.add_handler(CommandHandler("desfazer", undo_command))
+
+    application.add_handler(CommandHandler("done", done_command))
+    application.add_handler(CommandHandler("feito", done_command))
+
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("ajuda", help_command))
+
     application.add_handler(CommandHandler("setup_sheets", setup_sheets_command))
     application.add_handler(CommandHandler("add_week", add_week_command))
+    application.add_handler(CommandHandler("add_semana", add_week_command))
     application.add_handler(CommandHandler("add_month", add_month_command))
+    application.add_handler(CommandHandler("add_mes", add_month_command))
 
     # Register callback handler for buttons
     application.add_handler(CallbackQueryHandler(button_callback))

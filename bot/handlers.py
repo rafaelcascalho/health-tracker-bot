@@ -27,6 +27,42 @@ from bot.messages import (
 
 logger = logging.getLogger(__name__)
 
+# Action names translation (internal -> Portuguese display)
+ACTION_NAMES_PT = {
+    "wake_7am": "acordar",
+    "cardio": "cardio",
+    "breakfast": "cafe",
+    "lunch": "almoco",
+    "snack": "lanche",
+    "dinner": "jantar",
+    "water_1": "agua1",
+    "water_2": "agua2",
+    "water_3": "agua3",
+    "bedroom": "quarto",
+    "bed": "dormir",
+    "pilates": "pilates",
+    "gym": "academia",
+}
+
+# Reverse mapping (Portuguese -> internal)
+ACTION_NAMES_EN = {v: k for k, v in ACTION_NAMES_PT.items()}
+
+# All valid action inputs (both PT and EN)
+VALID_ACTIONS = list(ACTION_NAMES_PT.keys()) + list(ACTION_NAMES_EN.keys())
+
+
+def normalize_action(action: str) -> str:
+    """Convert action name to internal format (English)."""
+    action = action.lower()
+    if action in ACTION_NAMES_EN:
+        return ACTION_NAMES_EN[action]
+    return action
+
+
+def get_actions_display() -> str:
+    """Get formatted list of actions for display."""
+    return ", ".join(ACTION_NAMES_PT.values())
+
 
 def get_sheets_client() -> SheetsClient:
     """Get or create sheets client."""
@@ -167,12 +203,19 @@ async def gym_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await unauthorized_response(update)
         return
 
-    if not context.args or context.args[0].lower() not in ("friday", "saturday"):
-        await update.message.reply_text("Uso: /gym friday ou /gym saturday")
+    valid_days = ("friday", "saturday", "sexta", "sabado", "sábado")
+    if not context.args or context.args[0].lower() not in valid_days:
+        await update.message.reply_text("Uso: /gym sexta ou /gym sabado")
         return
 
-    day = context.args[0].lower()
-    day_pt = "Sexta" if day == "friday" else "Sábado"
+    day_input = context.args[0].lower()
+    # Normalize to English for storage
+    if day_input in ("sexta", "friday"):
+        day = "friday"
+        day_pt = "Sexta"
+    else:
+        day = "saturday"
+        day_pt = "Sábado"
 
     try:
         sheets = get_sheets_client()
@@ -221,26 +264,151 @@ async def undo_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
 
     if not context.args:
-        actions = [
-            "wake_7am", "cardio", "breakfast", "lunch", "snack", "dinner",
-            "water_1", "water_2", "water_3", "bedroom", "bed", "pilates", "gym"
-        ]
         await update.message.reply_text(
-            f"Uso: /undo <ação>\nAções disponíveis: {', '.join(actions)}"
+            f"Uso: /undo <ação>\nAções disponíveis: {get_actions_display()}"
         )
         return
 
-    action = context.args[0].lower()
+    action_input = context.args[0].lower()
+    action = normalize_action(action_input)
+
+    if action not in ACTION_NAMES_PT:
+        await update.message.reply_text(
+            f"❌ Ação desconhecida: {action_input}\nAções disponíveis: {get_actions_display()}"
+        )
+        return
 
     try:
         sheets = get_sheets_client()
         sheets.update_action(action, 0)
-        await update.message.reply_text(f"✓ Desfeito: {action}")
+        action_pt = ACTION_NAMES_PT.get(action, action)
+        await update.message.reply_text(f"✓ Desfeito: {action_pt}")
     except ValueError as e:
-        await update.message.reply_text(f"❌ Ação desconhecida: {action}")
+        await update.message.reply_text(f"❌ Ação desconhecida: {action_input}")
     except Exception as e:
         logger.error(f"Error in undo_command: {e}")
         await update.message.reply_text("❌ Erro ao desfazer ação.")
+
+
+async def done_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /done <action> command - manually log an action."""
+    if not is_authorized(update.effective_user.id):
+        await unauthorized_response(update)
+        return
+
+    if not context.args:
+        await update.message.reply_text(
+            f"Uso: /done <ação>\nAções disponíveis: {get_actions_display()}"
+        )
+        return
+
+    action_input = context.args[0].lower()
+    action = normalize_action(action_input)
+
+    if action not in ACTION_NAMES_PT:
+        await update.message.reply_text(
+            f"❌ Ação desconhecida: {action_input}\nAções disponíveis: {get_actions_display()}"
+        )
+        return
+
+    try:
+        sheets = get_sheets_client()
+
+        # Check if already done
+        current_value = sheets.get_action_value(action)
+        if current_value:
+            action_pt = ACTION_NAMES_PT.get(action, action)
+            await update.message.reply_text(f"✓ {action_pt} já registrado hoje!")
+            return
+
+        # Update action
+        sheets.update_action(action, 1)
+
+        # Get updated data and calculate points
+        data = sheets.get_today_data()
+        gym_day = sheets.get_gym_day_choice()
+
+        tz = pytz.timezone(config.TIMEZONE)
+        day_of_week = datetime.now(tz).weekday()
+
+        points = calculate_daily_points(data)
+        max_pts = get_max_points_for_day(day_of_week, gym_day)
+
+        # Get points for this action
+        action_points = config.POINTS.get(action, 1)
+
+        # Format confirmation
+        confirmation = format_action_confirmation(
+            action,
+            action_points,
+            points["grand_total"],
+            max_pts["total"]
+        )
+
+        # Check for milestones
+        milestone_msg = ""
+        percentage = points["grand_total"] / max_pts["total"] * 100 if max_pts["total"] > 0 else 0
+
+        if percentage >= 100:
+            milestone_msg = "\n\n" + format_milestone_message("perfect_day")
+        elif percentage >= 50 and (points["grand_total"] - action_points) / max_pts["total"] * 100 < 50:
+            milestone_msg = "\n\n" + format_milestone_message("halfway")
+
+        if action == "water_3":
+            milestone_msg += "\n" + format_milestone_message("water_hard_mode")
+
+        await update.message.reply_text(confirmation + milestone_msg)
+
+    except Exception as e:
+        logger.error(f"Error in done_command: {e}")
+        await update.message.reply_text("❌ Erro ao registrar ação.")
+
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /help command - show all available commands."""
+    if not is_authorized(update.effective_user.id):
+        await unauthorized_response(update)
+        return
+
+    help_text = """📋 *Comandos Disponíveis*
+
+*Progresso:*
+/hoje - Ver progresso de hoje
+/semana - Ver resumo da semana
+
+*Registrar ações:*
+/feito <ação> - Registrar uma ação manualmente
+/desfazer <ação> - Desfazer uma ação
+
+*Ações disponíveis:*
+acordar, cardio, cafe, almoco, lanche, jantar,
+agua1, agua2, agua3, quarto, dormir, pilates, academia
+
+*Refeições:*
+/refeicao <descrição> - Registrar refeição
+/besteira <descrição> - Registrar cheat meal
+
+*Água e Peso:*
+/agua - Ver status da água com botões
+/peso <kg> - Registrar peso (ou ver atual)
+
+*Academia:*
+/academia sexta - Definir academia para sexta
+/academia sabado - Definir academia para sábado
+
+*Administração:*
+/add_semana <data> [dia] - Adicionar semana
+/add_mes <data> - Adicionar mês
+/setup_sheets - Configurar planilhas
+
+*Exemplos:*
+• /feito academia
+• /feito cardio
+• /desfazer cafe
+• /refeicao ovos mexidos
+• /peso 75.5
+"""
+    await update.message.reply_text(help_text, parse_mode="Markdown")
 
 
 async def setup_sheets_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
