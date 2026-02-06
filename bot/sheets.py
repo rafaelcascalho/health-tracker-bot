@@ -518,9 +518,12 @@ class SheetsClient:
                 f'=COUNTIFS(Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
                 # E: total_pts (T=total_pts)
                 f'=SUMIFS(Daily_Log!T:T,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
-                # F: max_possible (O=pilates, P=gym)
-                f"=D{row_num}*15+SUMPRODUCT((Daily_Log!A:A>=B{row_num})*(Daily_Log!A:A<=C{row_num})"
-                "*(Daily_Log!O:O+Daily_Log!P:P>0))",
+                # F: max_possible (weekday=15, weekend=13, +exercise days)
+                f'=COUNTIFS(Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num},Daily_Log!B:B,"<>Saturday",Daily_Log!B:B,"<>Sunday")*15'
+                f'+COUNTIFS(Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num},Daily_Log!B:B,"Saturday")*13'
+                f'+COUNTIFS(Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num},Daily_Log!B:B,"Sunday")*13'
+                f'+COUNTIFS(Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num},Daily_Log!O:O,">"&0)'
+                f'+COUNTIFS(Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num},Daily_Log!P:P,">"&0)',
                 # G: cheat_meals (Q=cheat_meals)
                 f'=SUMIFS(Daily_Log!Q:Q,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
                 f"=G{row_num}*3",  # H: cheat_penalty
@@ -572,7 +575,16 @@ class SheetsClient:
                 "",
                 "",
             ],
-            ["Max Possível", "=B3*16", "", ""],
+            [
+                "Max Possível",
+                f'=COUNTIFS(Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY(),Daily_Log!B:B,"<>Saturday",Daily_Log!B:B,"<>Sunday")*15'
+                f'+COUNTIFS(Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY(),Daily_Log!B:B,"Saturday")*13'
+                f'+COUNTIFS(Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY(),Daily_Log!B:B,"Sunday")*13'
+                f'+COUNTIFS(Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY(),Daily_Log!O:O,">"&0)'
+                f'+COUNTIFS(Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY(),Daily_Log!P:P,">"&0)',
+                "",
+                "",
+            ],
             ["Progresso", "=IF(B5>0,B4/B5,0)", "", ""],
             # Linha 7: Vazia
             ["", "", "", ""],
@@ -600,7 +612,7 @@ class SheetsClient:
             ],
             [
                 "Status",
-                '=IF(B12>=16,"Perfeito",IF(B12>=10,"Bom","Atrasado"))',
+                '=IF(B12>=IF(WEEKDAY(TODAY(),2)>=6,13,15),"Perfeito",IF(B12>=10,"Bom","Atrasado"))',
                 "",
                 "",
             ],
@@ -765,8 +777,8 @@ class SheetsClient:
             f"=MAX(0,J{row_num}-K{row_num})",  # L: final_score
             f"=L{row_num}/106",  # M: percentage
             # N: status
-            f'=IF(M{row_num}>=1,"Perfect",IF(M{row_num}>=0.85,"Successful",'
-            f'IF(M{row_num}>=0.7,"Needs Improvement","Danger")))',
+            f'=IF(M{row_num}>=1,"Perfeito",IF(M{row_num}>=0.85,"Sucesso",'
+            f'IF(M{row_num}>=0.7,"Precisa Melhorar","Perigo")))',
         ]
 
         self.sheet.values().update(
