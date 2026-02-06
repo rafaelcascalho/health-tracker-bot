@@ -53,14 +53,15 @@ DAILY_COLUMNS = {
     "water_1": 8,  # I
     "water_2": 9,  # J
     "water_3": 10,  # K
-    "bedroom": 11,  # L
-    "bed": 12,  # M
-    "pilates": 13,  # N
-    "gym": 14,  # O
-    "cheat_meals": 15,  # P
-    "daily_pts": 16,  # Q
-    "exercise_pts": 17,  # R
-    "total_pts": 18,  # S
+    "water_copo": 11,  # L (Copo de 300 ml)
+    "bedroom": 12,  # M
+    "bed": 13,  # N
+    "pilates": 14,  # O
+    "gym": 15,  # P
+    "cheat_meals": 16,  # Q
+    "daily_pts": 17,  # R
+    "exercise_pts": 18,  # S
+    "total_pts": 19,  # T
 }
 
 # Points configuration
@@ -74,6 +75,7 @@ POINTS = {
     "water_1": 1,
     "water_2": 2,
     "water_3": 3,
+    "water_copo": 1,
     "bedroom": 1,
     "bed": 1,
     "pilates": 1,
@@ -81,13 +83,16 @@ POINTS = {
 }
 
 # Max daily points (excluding exercise which varies by day)
-MAX_DAILY_POINTS = 14  # wake + cardio + 4 meals + 3 water (6 pts) + bedroom + bed
+# Weekday: wake + cardio + 4 meals + 3 water (6 pts) + copo (1 pt) + bedroom + bed = 15
+# Weekend: no wake/cardio, so 15 - 2 = 13
+MAX_DAILY_POINTS = 15
+MAX_DAILY_POINTS_WEEKEND = 13
 
 # Schedule times (24h format)
 SCHEDULE = {
     "wake_reminder": "07:00",
+    "wake_reminder_weekend": "10:00",
     "cardio_weekday": "07:00",
-    "cardio_weekend": "10:00",
     "breakfast": "08:00",
     "lunch": "12:00",
     "hydration_check": "14:00",

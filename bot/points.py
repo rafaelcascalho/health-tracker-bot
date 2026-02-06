@@ -26,6 +26,7 @@ def calculate_daily_points(data: dict) -> dict:
         "water_1": data.get("water_1", 0) * config.POINTS["water_1"],
         "water_2": data.get("water_2", 0) * config.POINTS["water_2"],
         "water_3": data.get("water_3", 0) * config.POINTS["water_3"],
+        "water_copo": data.get("water_copo", 0) * config.POINTS["water_copo"],
         "bedroom": data.get("bedroom", 0) * config.POINTS["bedroom"],
         "bed": data.get("bed", 0) * config.POINTS["bed"],
         "pilates": data.get("pilates", 0) * config.POINTS["pilates"],
@@ -42,6 +43,7 @@ def calculate_daily_points(data: dict) -> dict:
         + points["water_1"]
         + points["water_2"]
         + points["water_3"]
+        + points["water_copo"]
         + points["bedroom"]
         + points["bed"]
     )
@@ -62,10 +64,12 @@ def get_max_points_for_day(day_of_week: int, gym_day_choice: Optional[str] = Non
     Returns:
         Dictionary with max points breakdown
     """
+    is_weekend = day_of_week >= 5
+    daily_max = config.MAX_DAILY_POINTS_WEEKEND if is_weekend else config.MAX_DAILY_POINTS
     max_pts = {
-        "daily": config.MAX_DAILY_POINTS,
+        "daily": daily_max,
         "exercise": 0,
-        "total": config.MAX_DAILY_POINTS,
+        "total": daily_max,
     }
 
     # Pilates days (Monday, Wednesday)
@@ -91,19 +95,20 @@ def calculate_week_max_points(gym_day_choice: Optional[str] = None) -> int:
     """Calculate maximum weekly points.
 
     Weekly breakdown:
-    - Daily points: 14 * 7 = 98
+    - Weekday daily points: 15 * 5 = 75
+    - Weekend daily points: 13 * 2 = 26 (no wake/cardio)
     - Pilates (Mon/Wed): 2
     - Gym (Tue/Thu + 1): 3
 
-    Total: 103
+    Total: 106
 
     Args:
         gym_day_choice: 'friday' or 'saturday'
 
     Returns:
-        Maximum possible weekly points (103)
+        Maximum possible weekly points (106)
     """
-    return 103  # Fixed: 98 daily + 2 pilates + 3 gym
+    return 106  # Fixed: 75 weekday + 26 weekend + 2 pilates + 3 gym
 
 
 def calculate_cheat_penalty(cheat_count: int) -> int:
@@ -139,35 +144,42 @@ def get_progress_status(percentage: float) -> str:
         return "Danger"
 
 
-def get_category_breakdown(data: dict) -> dict:
+def get_category_breakdown(data: dict, day_of_week: Optional[int] = None) -> dict:
     """Get breakdown by category.
 
     Categories:
-    - Sleep: wake_7am, bedroom, bed (3 pts max)
+    - Sleep: wake_7am, bedroom, bed (3 pts weekday, 2 pts weekend)
     - Nutrition: breakfast, lunch, snack, dinner (4 pts max)
-    - Hydration: water_1, water_2, water_3 (6 pts max)
-    - Cardio: cardio (1 pt max)
+    - Hydration: water_1, water_2, water_3, water_copo (7 pts max)
+    - Cardio: cardio (1 pt weekday, 0 pts weekend)
     - Exercise: pilates, gym (1 pt max per day)
 
     Args:
         data: Daily data dictionary
+        day_of_week: 0=Monday, 6=Sunday (used for weekend adjustments)
 
     Returns:
         Dictionary with category scores
     """
+    is_weekend = day_of_week is not None and day_of_week >= 5
+
+    sleep_current = data.get("bedroom", 0) + data.get("bed", 0)
+    sleep_items = {
+        "bedroom": data.get("bedroom", 0),
+        "bed": data.get("bed", 0),
+    }
+    sleep_max = 2
+
+    if not is_weekend:
+        sleep_current += data.get("wake_7am", 0)
+        sleep_items["wake_7am"] = data.get("wake_7am", 0)
+        sleep_max = 3
+
     return {
         "sleep": {
-            "current": (
-                data.get("wake_7am", 0)
-                + data.get("bedroom", 0)
-                + data.get("bed", 0)
-            ),
-            "max": 3,
-            "items": {
-                "wake_7am": data.get("wake_7am", 0),
-                "bedroom": data.get("bedroom", 0),
-                "bed": data.get("bed", 0),
-            },
+            "current": sleep_current,
+            "max": sleep_max,
+            "items": sleep_items,
         },
         "nutrition": {
             "current": (
@@ -189,18 +201,20 @@ def get_category_breakdown(data: dict) -> dict:
                 data.get("water_1", 0)
                 + data.get("water_2", 0) * 2
                 + data.get("water_3", 0) * 3
+                + data.get("water_copo", 0)
             ),
-            "max": 6,
+            "max": 7,
             "items": {
                 "water_1": data.get("water_1", 0),
                 "water_2": data.get("water_2", 0),
                 "water_3": data.get("water_3", 0),
+                "water_copo": data.get("water_copo", 0),
             },
         },
         "cardio": {
-            "current": data.get("cardio", 0),
-            "max": 1,
-            "items": {"cardio": data.get("cardio", 0)},
+            "current": 0 if is_weekend else data.get("cardio", 0),
+            "max": 0 if is_weekend else 1,
+            "items": {"cardio": 0 if is_weekend else data.get("cardio", 0)},
         },
         "exercise": {
             "current": data.get("pilates", 0) + data.get("gym", 0),

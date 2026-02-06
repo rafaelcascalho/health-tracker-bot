@@ -24,7 +24,8 @@ def format_water_status(water_data: dict) -> str:
     w1 = water_data.get("water_1", 0)
     w2 = water_data.get("water_2", 0)
     w3 = water_data.get("water_3", 0)
-    total_pts = w1 + w2 * 2 + w3 * 3
+    wc = water_data.get("water_copo", 0)
+    total_pts = w1 + w2 * 2 + w3 * 3 + wc
 
     lines = [
         "💧 Hidratação",
@@ -32,8 +33,9 @@ def format_water_status(water_data: dict) -> str:
         f"[{format_checkmark(w1)}] Garrafa 1 (+1 pt)",
         f"[{format_checkmark(w2)}] Garrafa 2 (+2 pts)",
         f"[{format_checkmark(w3)}] Garrafa 3 (+3 pts) ⏰ antes das 20h",
+        f"[{format_checkmark(wc)}] Copo de 300 ml (+1 pt)",
         "",
-        f"Progresso: {total_pts}/6 pts",
+        f"Progresso: {total_pts}/7 pts",
     ]
 
     return "\n".join(lines)
@@ -46,17 +48,19 @@ def format_daily_summary(data: dict, gym_day_choice: Optional[str] = None) -> st
     date_str = today.strftime("%d/%m")
     day_of_week = today.weekday()
 
-    categories = get_category_breakdown(data)
+    categories = get_category_breakdown(data, day_of_week)
     points = calculate_daily_points(data)
     max_pts = get_max_points_for_day(day_of_week, gym_day_choice)
+    is_weekend = day_of_week >= 5
 
     # Build sleep line
     sleep = categories["sleep"]
-    sleep_checks = "".join([
-        format_checkmark(sleep["items"]["wake_7am"]),
-        format_checkmark(sleep["items"]["bedroom"]),
-        format_checkmark(sleep["items"]["bed"]),
-    ])
+    sleep_parts = []
+    if not is_weekend:
+        sleep_parts.append(format_checkmark(sleep["items"].get("wake_7am", 0)))
+    sleep_parts.append(format_checkmark(sleep["items"]["bedroom"]))
+    sleep_parts.append(format_checkmark(sleep["items"]["bed"]))
+    sleep_checks = "".join(sleep_parts)
 
     # Build nutrition line
     nutrition = categories["nutrition"]
@@ -73,6 +77,7 @@ def format_daily_summary(data: dict, gym_day_choice: Optional[str] = None) -> st
         format_checkmark(hydration["items"]["water_1"]),
         format_checkmark(hydration["items"]["water_2"]),
         format_checkmark(hydration["items"]["water_3"]),
+        format_checkmark(hydration["items"]["water_copo"]),
     ])
 
     # Build cardio line
@@ -103,11 +108,16 @@ def format_daily_summary(data: dict, gym_day_choice: Optional[str] = None) -> st
         f"Sono:       {sleep_checks} ({sleep['current']}/{sleep['max']})",
         f"Nutrição:   {nutrition_checks} ({nutrition['current']}/{nutrition['max']})",
         f"Hidratação: {hydration_checks} ({hydration['current']}/{hydration['max']})",
-        f"Cardio:     {cardio_check} ({cardio['current']}/{cardio['max']})",
+    ]
+
+    if not is_weekend:
+        lines.append(f"Cardio:     {cardio_check} ({cardio['current']}/{cardio['max']})")
+
+    lines.extend([
         f"Exercício:  {exercise_str} ({exercise['current']}/{max_pts['exercise']})",
         "",
         f"Total: {daily_total}/{max_total} pts {status_emoji}",
-    ]
+    ])
 
     return "\n".join(lines)
 
@@ -187,9 +197,13 @@ def format_today_progress(data: dict, gym_day_choice: Optional[str] = None) -> s
     completed = []
     pending = []
 
-    actions = [
-        ("wake_7am", "Acordar às 7h", data.get("wake_7am", 0)),
-        ("cardio", "Cardio", data.get("cardio", 0)),
+    is_weekend = day_of_week >= 5
+
+    actions = []
+    if not is_weekend:
+        actions.append(("wake_7am", "Acordar às 7h", data.get("wake_7am", 0)))
+        actions.append(("cardio", "Cardio", data.get("cardio", 0)))
+    actions.extend([
         ("breakfast", "Café da manhã", data.get("breakfast", 0)),
         ("lunch", "Almoço", data.get("lunch", 0)),
         ("snack", "Lanche", data.get("snack", 0)),
@@ -197,9 +211,10 @@ def format_today_progress(data: dict, gym_day_choice: Optional[str] = None) -> s
         ("water_1", "Água #1", data.get("water_1", 0)),
         ("water_2", "Água #2", data.get("water_2", 0)),
         ("water_3", "Água #3", data.get("water_3", 0)),
+        ("water_copo", "Copo de 300 ml", data.get("water_copo", 0)),
         ("bedroom", "Quarto às 22h", data.get("bedroom", 0)),
         ("bed", "Cama às 22:30", data.get("bed", 0)),
-    ]
+    ])
 
     # Add exercise based on day
     if day_of_week in config.PILATES_DAYS:
@@ -249,6 +264,7 @@ def format_action_confirmation(
         "water_1": "Água #1",
         "water_2": "Água #2",
         "water_3": "Água #3 (modo difícil!)",
+        "water_copo": "Copo de 300 ml",
         "bedroom": "Hora do quarto",
         "bed": "Hora de dormir",
         "pilates": "Pilates",
@@ -310,13 +326,15 @@ Vou te ajudar a acompanhar seus hábitos diários e ganhar pontos por:
 🍽️ Nutrição (4 pts)
 - Café da manhã, Almoço, Lanche, Jantar
 
-💧 Hidratação (6 pts)
+💧 Hidratação (7 pts)
 - Garrafa 1: +1 pt
 - Garrafa 2: +2 pts
 - Garrafa 3: +3 pts (antes das 20h)
+- Copo de 300 ml: +1 pt
 
 🏃 Cardio (1 pt)
-- Sessão diária de cardio
+- Sessão diária (seg-sex)
+- Sem cardio nos fins de semana
 
 🏋️ Exercício (varia)
 - Pilates: Seg/Qua

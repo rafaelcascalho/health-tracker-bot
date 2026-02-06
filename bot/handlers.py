@@ -38,6 +38,7 @@ ACTION_NAMES_PT = {
     "water_1": "agua1",
     "water_2": "agua2",
     "water_3": "agua3",
+    "water_copo": "copo",
     "bedroom": "quarto",
     "bed": "dormir",
     "pilates": "pilates",
@@ -382,7 +383,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 *Ações disponíveis:*
 acordar, cardio, cafe, almoco, lanche, jantar,
-agua1, agua2, agua3, quarto, dormir, pilates, academia
+agua1, agua2, agua3, copo, quarto, dormir, pilates, academia
 
 *Refeições:*
 /refeicao <descrição> - Registrar refeição
@@ -500,6 +501,8 @@ def build_water_keyboard(water_data: dict) -> InlineKeyboardMarkup:
         buttons.append(InlineKeyboardButton("💧 Garrafa 2", callback_data="action:water_2"))
     if not water_data.get("water_3"):
         buttons.append(InlineKeyboardButton("💧 Garrafa 3", callback_data="action:water_3"))
+    if not water_data.get("water_copo"):
+        buttons.append(InlineKeyboardButton("💧 Copo de 300 ml", callback_data="action:water_copo"))
 
     # Arrange buttons in rows
     keyboard = []

@@ -73,15 +73,17 @@ class SheetsClient:
         new_row = [today, day_name] + [0] * (len(config.DAILY_COLUMNS) - 2)
 
         # Add formulas for points columns
-        # daily_pts = sum of wake through bed (C through M), with water_2 *2 and water_3 *3
+        # daily_pts = sum of wake through bed (C through N), with water_2 *2, water_3 *3
+        # Columns: C=wake, D=cardio, E=breakfast, F=lunch, G=snack, H=dinner,
+        #          I=water_1, J=water_2, K=water_3, L=water_copo, M=bedroom, N=bed
         new_row[config.DAILY_COLUMNS["daily_pts"]] = (
             f"=C{row_num}+D{row_num}+E{row_num}+F{row_num}+G{row_num}+H{row_num}"
-            f"+I{row_num}+J{row_num}*2+K{row_num}*3+L{row_num}+M{row_num}"
+            f"+I{row_num}+J{row_num}*2+K{row_num}*3+L{row_num}+M{row_num}+N{row_num}"
         )
         # exercise_pts = pilates + gym
-        new_row[config.DAILY_COLUMNS["exercise_pts"]] = f"=N{row_num}+O{row_num}"
+        new_row[config.DAILY_COLUMNS["exercise_pts"]] = f"=O{row_num}+P{row_num}"
         # total_pts = daily + exercise
-        new_row[config.DAILY_COLUMNS["total_pts"]] = f"=Q{row_num}+R{row_num}"
+        new_row[config.DAILY_COLUMNS["total_pts"]] = f"=R{row_num}+S{row_num}"
 
         self.sheet.values().update(
             spreadsheetId=self.spreadsheet_id,
@@ -155,7 +157,7 @@ class SheetsClient:
 
         result = self.sheet.values().get(
             spreadsheetId=self.spreadsheet_id,
-            range=f"{config.SHEET_DAILY_LOG}!A{row}:S{row}",
+            range=f"{config.SHEET_DAILY_LOG}!A{row}:T{row}",
         ).execute()
 
         values = result.get("values", [[]])[0]
@@ -235,10 +237,12 @@ class SheetsClient:
             "water_1": data.get("water_1", 0),
             "water_2": data.get("water_2", 0),
             "water_3": data.get("water_3", 0),
+            "water_copo": data.get("water_copo", 0),
             "total_points": (
                 data.get("water_1", 0)
                 + data.get("water_2", 0) * 2
                 + data.get("water_3", 0) * 3
+                + data.get("water_copo", 0)
             ),
         }
 
@@ -335,7 +339,7 @@ class SheetsClient:
         # Get all data from Daily_Log
         result = self.sheet.values().get(
             spreadsheetId=self.spreadsheet_id,
-            range=f"{config.SHEET_DAILY_LOG}!A:S",
+            range=f"{config.SHEET_DAILY_LOG}!A:T",
         ).execute()
 
         values = result.get("values", [])
@@ -390,19 +394,19 @@ class SheetsClient:
             True if successful.
         """
         headers = [
-            "week_num",
-            "start_date",
-            "end_date",
-            "gym_choice",
-            "sleep_pts",
-            "nutrition_pts",
-            "hydration_pts",
-            "cardio_pts",
-            "exercise_pts",
-            "raw_score",
-            "cheat_penalty",
-            "final_score",
-            "percentage",
+            "num_semana",
+            "data_inicio",
+            "data_fim",
+            "dia_academia",
+            "pts_sono",
+            "pts_nutricao",
+            "pts_hidratacao",
+            "pts_cardio",
+            "pts_exercicio",
+            "pontuacao_bruta",
+            "penalidade_besteira",
+            "pontuacao_final",
+            "porcentagem",
             "status",
         ]
 
@@ -432,32 +436,33 @@ class SheetsClient:
                 start_date,  # B: start_date
                 f"=B{row_num}+6",  # C: end_date
                 gym_choice,  # D: gym_choice (manual)
-                # E: sleep_pts
+                # E: sleep_pts (C=wake, M=bedroom, N=bed)
                 f'=SUMIFS(Daily_Log!C:C,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})'
-                f'+SUMIFS(Daily_Log!L:L,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})'
-                f'+SUMIFS(Daily_Log!M:M,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
+                f'+SUMIFS(Daily_Log!M:M,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})'
+                f'+SUMIFS(Daily_Log!N:N,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
                 # F: nutrition_pts
                 f'=SUMIFS(Daily_Log!E:E,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})'
                 f'+SUMIFS(Daily_Log!F:F,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})'
                 f'+SUMIFS(Daily_Log!G:G,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})'
                 f'+SUMIFS(Daily_Log!H:H,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
-                # G: hydration_pts
+                # G: hydration_pts (I=water_1, J=water_2*2, K=water_3*3, L=water_copo)
                 f'=SUMIFS(Daily_Log!I:I,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})'
                 f'+SUMIFS(Daily_Log!J:J,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})*2'
-                f'+SUMIFS(Daily_Log!K:K,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})*3',
+                f'+SUMIFS(Daily_Log!K:K,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})*3'
+                f'+SUMIFS(Daily_Log!L:L,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
                 # H: cardio_pts
                 f'=SUMIFS(Daily_Log!D:D,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
-                # I: exercise_pts
-                f'=SUMIFS(Daily_Log!N:N,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})'
-                f'+SUMIFS(Daily_Log!O:O,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
+                # I: exercise_pts (O=pilates, P=gym)
+                f'=SUMIFS(Daily_Log!O:O,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})'
+                f'+SUMIFS(Daily_Log!P:P,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
                 f"=E{row_num}+F{row_num}+G{row_num}+H{row_num}+I{row_num}",  # J: raw_score
-                # K: cheat_penalty
-                f'=SUMIFS(Daily_Log!P:P,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})*3',
+                # K: cheat_penalty (Q=cheat_meals)
+                f'=SUMIFS(Daily_Log!Q:Q,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})*3',
                 f"=MAX(0,J{row_num}-K{row_num})",  # L: final_score
-                f"=L{row_num}/103",  # M: percentage
+                f"=L{row_num}/106",  # M: percentage
                 # N: status
-                f'=IF(M{row_num}>=1,"Perfect",IF(M{row_num}>=0.85,"Successful",'
-                f'IF(M{row_num}>=0.7,"Needs Improvement","Danger")))',
+                f'=IF(M{row_num}>=1,"Perfeito",IF(M{row_num}>=0.85,"Sucesso",'
+                f'IF(M{row_num}>=0.7,"Precisa Melhorar","Perigo")))',
             ]
             all_rows.append(row_formulas)
 
@@ -480,17 +485,17 @@ class SheetsClient:
             True if successful.
         """
         headers = [
-            "month",
-            "start_date",
-            "end_date",
-            "days_tracked",
-            "total_pts",
-            "max_possible",
-            "cheat_meals",
-            "cheat_penalty",
-            "final_score",
-            "avg_daily",
-            "perfect_days",
+            "mes",
+            "data_inicio",
+            "data_fim",
+            "dias_registrados",
+            "pts_total",
+            "max_possivel",
+            "besteiras",
+            "penalidade_besteira",
+            "pontuacao_final",
+            "media_diaria",
+            "dias_perfeitos",
             "status",
         ]
 
@@ -511,21 +516,23 @@ class SheetsClient:
                 f"=EOMONTH(B{row_num},0)",  # C: end_date
                 # D: days_tracked
                 f'=COUNTIFS(Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
-                # E: total_pts
-                f'=SUMIFS(Daily_Log!S:S,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
-                # F: max_possible
-                f"=D{row_num}*14+SUMPRODUCT((Daily_Log!A:A>=B{row_num})*(Daily_Log!A:A<=C{row_num})"
-                "*(Daily_Log!N:N+Daily_Log!O:O>0))",
-                # G: cheat_meals
-                f'=SUMIFS(Daily_Log!P:P,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
+                # E: total_pts (T=total_pts)
+                f'=SUMIFS(Daily_Log!T:T,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
+                # F: max_possible (O=pilates, P=gym)
+                f"=D{row_num}*15+SUMPRODUCT((Daily_Log!A:A>=B{row_num})*(Daily_Log!A:A<=C{row_num})"
+                "*(Daily_Log!O:O+Daily_Log!P:P>0))",
+                # G: cheat_meals (Q=cheat_meals)
+                f'=SUMIFS(Daily_Log!Q:Q,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
                 f"=G{row_num}*3",  # H: cheat_penalty
                 f"=MAX(0,E{row_num}-H{row_num})",  # I: final_score
                 f"=IF(D{row_num}>0,I{row_num}/D{row_num},0)",  # J: avg_daily
-                # K: perfect_days
-                f'=COUNTIFS(Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num},Daily_Log!Q:Q,14)',
+                # K: perfect_days (R=daily_pts: 15 on weekdays, 13 on weekends)
+                f'=COUNTIFS(Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num},Daily_Log!R:R,15)'
+                f'+COUNTIFS(Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num},Daily_Log!R:R,13,Daily_Log!B:B,"Saturday")'
+                f'+COUNTIFS(Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num},Daily_Log!R:R,13,Daily_Log!B:B,"Sunday")',
                 # L: status
-                f'=IF(J{row_num}>=14,"Perfect",IF(J{row_num}>=12,"Excellent",'
-                f'IF(J{row_num}>=10,"Good",IF(J{row_num}>=8,"Needs Work","Danger"))))',
+                f'=IF(J{row_num}>=15,"Perfeito",IF(J{row_num}>=12,"Excelente",'
+                f'IF(J{row_num}>=10,"Bom",IF(J{row_num}>=8,"Precisa Melhorar","Perigo"))))',
             ]
             all_rows.append(row_formulas)
 
@@ -550,84 +557,91 @@ class SheetsClient:
 
         # Build dashboard data
         dashboard_data = [
-            # Section A: Current Week (Rows 1-6)
-            ["CURRENT WEEK", "", "", ""],
-            ["Week #", "=ISOWEEKNUM(TODAY())", "", ""],
+            # Seção A: Semana Atual (Linhas 1-6)
+            ["SEMANA ATUAL", "", "", ""],
+            ["Semana", "=ISOWEEKNUM(TODAY())", "", ""],
             [
-                "Days Tracked",
+                "Dias Registrados",
                 f'=COUNTIFS(Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())',
                 "",
                 "",
             ],
             [
-                "Points",
-                f'=SUMIFS(Daily_Log!S:S,Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())',
+                "Pontos",
+                f'=SUMIFS(Daily_Log!T:T,Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())',
                 "",
                 "",
             ],
-            ["Max Possible", "=B3*15", "", ""],
-            ["Progress", "=IF(B5>0,B4/B5,0)", "", ""],
-            # Row 7: Empty
+            ["Max Possível", "=B3*16", "", ""],
+            ["Progresso", "=IF(B5>0,B4/B5,0)", "", ""],
+            # Linha 7: Vazia
             ["", "", "", ""],
-            # Section B: Today (Rows 8-14)
-            ["TODAY", "", "", ""],
-            ["Date", "=TODAY()", "", ""],
+            # Seção B: Hoje (Linhas 8-14)
+            ["HOJE", "", "", ""],
+            ["Data", "=TODAY()", "", ""],
             [
-                "Daily Pts",
-                "=IFERROR(INDEX(Daily_Log!Q:Q,MATCH(TODAY(),Daily_Log!A:A,0)),0)",
+                "Pts Diários",
+                "=IFERROR(INDEX(Daily_Log!R:R,MATCH(TODAY(),Daily_Log!A:A,0)),0)",
                 "",
                 "",
             ],
             [
-                "Exercise",
-                "=IFERROR(INDEX(Daily_Log!R:R,MATCH(TODAY(),Daily_Log!A:A,0)),0)",
+                "Exercício",
+                "=IFERROR(INDEX(Daily_Log!S:S,MATCH(TODAY(),Daily_Log!A:A,0)),0)",
                 "",
                 "",
             ],
             ["Total", "=B10+B11", "", ""],
             [
-                "Cheat Meals",
-                "=IFERROR(INDEX(Daily_Log!P:P,MATCH(TODAY(),Daily_Log!A:A,0)),0)",
+                "Besteiras",
+                "=IFERROR(INDEX(Daily_Log!Q:Q,MATCH(TODAY(),Daily_Log!A:A,0)),0)",
                 "",
                 "",
             ],
             [
                 "Status",
-                '=IF(B12>=15,"Perfect",IF(B12>=10,"Good","Behind"))',
+                '=IF(B12>=16,"Perfeito",IF(B12>=10,"Bom","Atrasado"))',
                 "",
                 "",
             ],
-            # Row 15: Empty
+            # Linha 15: Vazia
             ["", "", "", ""],
-            # Section C: Stats (Rows 16-22)
-            ["STATS", "", "", ""],
-            ["Total Days", "=COUNTA(Daily_Log!A:A)-1", "", ""],
-            ["Perfect Days", "=COUNTIF(Daily_Log!Q:Q,14)", "", ""],
-            ["Avg Daily Pts", "=IFERROR(AVERAGE(Daily_Log!S:S),0)", "", ""],
-            ["Total Cheat", "=SUM(Daily_Log!P:P)", "", ""],
-            ["Best Week", "=MAX(Weekly_Summary!L:L)", "", ""],
+            # Seção C: Estatísticas (Linhas 16-22)
+            ["ESTATÍSTICAS", "", "", ""],
+            ["Total de Dias", "=COUNTA(Daily_Log!A:A)-1", "", ""],
             [
-                "Current Weight",
+                "Dias Perfeitos",
+                "=COUNTIF(Daily_Log!R:R,15)"
+                '+COUNTIFS(Daily_Log!R:R,13,Daily_Log!B:B,"Saturday")'
+                '+COUNTIFS(Daily_Log!R:R,13,Daily_Log!B:B,"Sunday")',
+                "",
+                "",
+            ],
+            ["Média Pts Diários", "=IFERROR(AVERAGE(Daily_Log!T:T),0)", "", ""],
+            ["Total Besteiras", "=SUM(Daily_Log!Q:Q)", "", ""],
+            ["Melhor Semana", "=MAX(Weekly_Summary!L:L)", "", ""],
+            [
+                "Peso Atual",
                 '=IFERROR(INDEX(Config!B:B,MATCH("current_weight",Config!A:A,0)),"--")',
                 "",
                 "",
             ],
-            # Row 23: Empty
+            # Linha 23: Vazia
             ["", "", "", ""],
-            # Section D: This Week by Category (Rows 24-30)
-            ["THIS WEEK BY CATEGORY", "", "", ""],
-            # Sleep
+            # Seção D: Semana por Categoria (Linhas 24-30)
+            ["SEMANA POR CATEGORIA", "", "", ""],
+            # Sono (C=acordar, M=quarto, N=cama)
             [
-                "Sleep",
+                "Sono",
                 f'=SUMIFS(Daily_Log!C:C,Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())'
-                f'+SUMIFS(Daily_Log!L:L,Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())'
-                f'+SUMIFS(Daily_Log!M:M,Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())',
-                "/21",
+                f'+SUMIFS(Daily_Log!M:M,Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())'
+                f'+SUMIFS(Daily_Log!N:N,Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())',
+                "/19",
                 "",
             ],
-            # Nutrition
+            # Nutrição
             [
-                "Nutrition",
+                "Nutrição",
                 f'=SUMIFS(Daily_Log!E:E,Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())'
                 f'+SUMIFS(Daily_Log!F:F,Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())'
                 f'+SUMIFS(Daily_Log!G:G,Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())'
@@ -635,32 +649,33 @@ class SheetsClient:
                 "/28",
                 "",
             ],
-            # Hydration
+            # Hidratação (I=garrafa_1, J=garrafa_2*2, K=garrafa_3*3, L=copo_300ml)
             [
-                "Hydration",
+                "Hidratação",
                 f'=SUMIFS(Daily_Log!I:I,Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())'
                 f'+SUMIFS(Daily_Log!J:J,Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())*2'
-                f'+SUMIFS(Daily_Log!K:K,Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())*3',
-                "/42",
+                f'+SUMIFS(Daily_Log!K:K,Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())*3'
+                f'+SUMIFS(Daily_Log!L:L,Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())',
+                "/49",
                 "",
             ],
-            # Cardio
+            # Cardio (somente dias úteis, max 5)
             [
                 "Cardio",
                 f'=SUMIFS(Daily_Log!D:D,Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())',
-                "/7",
+                "/5",
                 "",
             ],
-            # Exercise
+            # Exercício (O=pilates, P=academia)
             [
-                "Exercise",
-                f'=SUMIFS(Daily_Log!N:N,Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())'
-                f'+SUMIFS(Daily_Log!O:O,Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())',
+                "Exercício",
+                f'=SUMIFS(Daily_Log!O:O,Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())'
+                f'+SUMIFS(Daily_Log!P:P,Daily_Log!A:A,">="&{week_start},Daily_Log!A:A,"<="&TODAY())',
                 "/5",
                 "",
             ],
             # Total
-            ["TOTAL", "=SUM(B25:B29)", "/103", ""],
+            ["TOTAL", "=SUM(B25:B29)", "/106", ""],
         ]
 
         # Write all dashboard data
@@ -725,29 +740,30 @@ class SheetsClient:
             start_date,  # B: start_date
             f"=B{row_num}+6",  # C: end_date
             gym_choice,  # D: gym_choice
-            # E: sleep_pts
+            # E: sleep_pts (C=wake, M=bedroom, N=bed)
             f'=SUMIFS(Daily_Log!C:C,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})'
-            f'+SUMIFS(Daily_Log!L:L,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})'
-            f'+SUMIFS(Daily_Log!M:M,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
+            f'+SUMIFS(Daily_Log!M:M,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})'
+            f'+SUMIFS(Daily_Log!N:N,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
             # F: nutrition_pts
             f'=SUMIFS(Daily_Log!E:E,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})'
             f'+SUMIFS(Daily_Log!F:F,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})'
             f'+SUMIFS(Daily_Log!G:G,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})'
             f'+SUMIFS(Daily_Log!H:H,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
-            # G: hydration_pts
+            # G: hydration_pts (I=water_1, J=water_2*2, K=water_3*3, L=water_copo)
             f'=SUMIFS(Daily_Log!I:I,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})'
             f'+SUMIFS(Daily_Log!J:J,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})*2'
-            f'+SUMIFS(Daily_Log!K:K,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})*3',
+            f'+SUMIFS(Daily_Log!K:K,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})*3'
+            f'+SUMIFS(Daily_Log!L:L,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
             # H: cardio_pts
             f'=SUMIFS(Daily_Log!D:D,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
-            # I: exercise_pts
-            f'=SUMIFS(Daily_Log!N:N,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})'
-            f'+SUMIFS(Daily_Log!O:O,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
+            # I: exercise_pts (O=pilates, P=gym)
+            f'=SUMIFS(Daily_Log!O:O,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})'
+            f'+SUMIFS(Daily_Log!P:P,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
             f"=E{row_num}+F{row_num}+G{row_num}+H{row_num}+I{row_num}",  # J: raw_score
-            # K: cheat_penalty
-            f'=SUMIFS(Daily_Log!P:P,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})*3',
+            # K: cheat_penalty (Q=cheat_meals)
+            f'=SUMIFS(Daily_Log!Q:Q,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})*3',
             f"=MAX(0,J{row_num}-K{row_num})",  # L: final_score
-            f"=L{row_num}/103",  # M: percentage
+            f"=L{row_num}/106",  # M: percentage
             # N: status
             f'=IF(M{row_num}>=1,"Perfect",IF(M{row_num}>=0.85,"Successful",'
             f'IF(M{row_num}>=0.7,"Needs Improvement","Danger")))',
@@ -785,21 +801,23 @@ class SheetsClient:
             f"=EOMONTH(B{row_num},0)",  # C: end_date
             # D: days_tracked
             f'=COUNTIFS(Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
-            # E: total_pts
-            f'=SUMIFS(Daily_Log!S:S,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
-            # F: max_possible
-            f"=D{row_num}*14+SUMPRODUCT((Daily_Log!A:A>=B{row_num})*(Daily_Log!A:A<=C{row_num})"
-            "*(Daily_Log!N:N+Daily_Log!O:O>0))",
-            # G: cheat_meals
-            f'=SUMIFS(Daily_Log!P:P,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
+            # E: total_pts (T=total_pts)
+            f'=SUMIFS(Daily_Log!T:T,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
+            # F: max_possible (O=pilates, P=gym)
+            f"=D{row_num}*15+SUMPRODUCT((Daily_Log!A:A>=B{row_num})*(Daily_Log!A:A<=C{row_num})"
+            "*(Daily_Log!O:O+Daily_Log!P:P>0))",
+            # G: cheat_meals (Q=cheat_meals)
+            f'=SUMIFS(Daily_Log!Q:Q,Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num})',
             f"=G{row_num}*3",  # H: cheat_penalty
             f"=MAX(0,E{row_num}-H{row_num})",  # I: final_score
             f"=IF(D{row_num}>0,I{row_num}/D{row_num},0)",  # J: avg_daily
-            # K: perfect_days
-            f'=COUNTIFS(Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num},Daily_Log!Q:Q,14)',
+            # K: perfect_days (R=daily_pts: 15 on weekdays, 13 on weekends)
+            f'=COUNTIFS(Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num},Daily_Log!R:R,15)'
+            f'+COUNTIFS(Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num},Daily_Log!R:R,13,Daily_Log!B:B,"Saturday")'
+            f'+COUNTIFS(Daily_Log!A:A,">="&B{row_num},Daily_Log!A:A,"<="&C{row_num},Daily_Log!R:R,13,Daily_Log!B:B,"Sunday")',
             # L: status
-            f'=IF(J{row_num}>=14,"Perfect",IF(J{row_num}>=12,"Excellent",'
-            f'IF(J{row_num}>=10,"Good",IF(J{row_num}>=8,"Needs Work","Danger"))))',
+            f'=IF(J{row_num}>=15,"Perfeito",IF(J{row_num}>=12,"Excelente",'
+            f'IF(J{row_num}>=10,"Bom",IF(J{row_num}>=8,"Precisa Melhorar","Perigo"))))',
         ]
 
         self.sheet.values().update(

@@ -88,8 +88,9 @@ async def send_water_warning(context) -> None:
         sheets = get_sheets_client()
         water_data = sheets.get_water_status()
 
-        # Check if all bottles are done
-        if water_data.get("water_1") and water_data.get("water_2") and water_data.get("water_3"):
+        # Check if all water items are done
+        if (water_data.get("water_1") and water_data.get("water_2")
+                and water_data.get("water_3") and water_data.get("water_copo")):
             return  # All done, no warning needed
 
         message = "⚠️ Water reminder! Don't forget to hydrate!\n\n"
@@ -138,11 +139,11 @@ async def cardio_weekday_job(context) -> None:
         await send_reminder(context, "cardio", "cardio")
 
 
-async def cardio_weekend_job(context) -> None:
-    """10am cardio reminder (weekends only)."""
+async def wake_reminder_weekend_job(context) -> None:
+    """10am weekend wake reminder (informational, no tracking)."""
     tz = pytz.timezone(config.TIMEZONE)
     if datetime.now(tz).weekday() >= 5:  # Saturday-Sunday
-        await send_reminder(context, "cardio", "cardio")
+        await send_reminder(context, "wake")
 
 
 async def breakfast_job(context) -> None:
@@ -237,12 +238,12 @@ def setup_scheduler(application: Application) -> None:
         name="cardio_weekday",
     )
 
-    # Cardio weekend - 10am weekends
+    # Wake reminder weekend - 10am weekends (informational only)
     job_queue.run_daily(
-        cardio_weekend_job,
-        time=times["cardio_weekend"],
+        wake_reminder_weekend_job,
+        time=times["wake_reminder_weekend"],
         days=(5, 6),  # Sat-Sun
-        name="cardio_weekend",
+        name="wake_reminder_weekend",
     )
 
     # Breakfast - 8am daily
